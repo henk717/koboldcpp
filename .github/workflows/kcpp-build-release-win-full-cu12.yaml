@@ -6,7 +6,7 @@ env:
 
 jobs:
   windows:
-    runs-on: windows-2019
+    runs-on: windows-2022
     steps:
       - name: Clone
         id: checkout
@@ -41,7 +41,7 @@ jobs:
       - uses: Jimver/cuda-toolkit@v0.2.15
         id: cuda-toolkit
         with:
-          cuda: '12.1.0'
+          cuda: '12.4.0'
 
       - name: Build CUDA
         id: cmake_build
@@ -61,8 +61,8 @@ jobs:
       #     ls
       - name: Copy CuBLAS Libraries
         run: |
-          copy "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1\bin\cublasLt64_12.dll" .
-          copy "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1\bin\cublas64_12.dll" .
+          copy "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.4\bin\cublasLt64_12.dll" .
+          copy "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.4\bin\cublas64_12.dll" .
           ls
 
       - name: Package PyInstallers
