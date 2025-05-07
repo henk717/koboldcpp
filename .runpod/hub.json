@@ -1,0 +1,80 @@
+{
+    "title": "Koboldcpp",
+    "description": "An easy fast GGUF based API server for LLM's, Image Gen and more with a bundled UI",
+    "type": "pod",
+    "category": "language",
+    "iconUrl": "https://raw.githubusercontent.com/LostRuins/koboldcpp/refs/heads/concedo/niko.ico",
+    "config": {
+      "runsOn": "GPU",
+      "containerDiskInGb": 125,
+      "presets": [
+        {
+          "name": "Tiefighter (20GB of vram)",
+          "defaults": {
+            "KCPP_MODEL": "https://huggingface.co/KoboldAI/LLaMA2-13B-Tiefighter-GGUF/resolve/main/LLaMA2-13B-Tiefighter.Q4_K_S.gguf",
+            "KCPP_ARGS": "--contextsize 4096 --chatcompletionsadapter AutoGuess --ttsgpu --multiplayer  --sdquant --usecublas mmq --gpulayers 9999 --multiuser 20 --flashattention --ignoremissing",
+            "KCPP_IMGMODEL": "https://huggingface.co/fp16-guy/PicX_real/resolve/main/picX_real.safetensors",
+            "KCPP_WHISPERMODEL": "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin?download=true",
+            "KCPP_TTSMODEL": "https://huggingface.co/koboldcpp/tts/resolve/main/OuteTTS-0.3-500M-Q4_0.gguf"
+          }
+        }
+      ],
+      "env": [
+        {
+          "key": "KCPP_MODEL",
+          "input": {
+            "name": "Language Model",
+            "type": "string",
+            "description": "A direct link to a GGUF file for the model, if you need multiple seperate them with commas",
+            "default": ""
+          }
+        },
+        {
+            "key": "KCPP_ARGS",
+            "input": {
+              "name": "Commandline Arguments",
+              "type": "string",
+              "description": "For a full list of arguments use --help in your local copy of KoboldCpp",
+              "default": "--contextsize 4096 --chatcompletionsadapter AutoGuess --ttsgpu --multiplayer  --sdquant --usecublas mmq --gpulayers 9999 --multiuser 20 --flashattention --ignoremissing"
+            }
+        },
+        {
+            "key": "KCPP_IMGMODEL",
+            "input": {
+              "name": "Image Model",
+              "type": "string",
+              "description": "A direct link to a GGUF file for the model, if you need multiple seperate them with commas",
+              "default": ""
+            }
+        },
+        {
+            "key": "KCPP_WHISPERMODEL",
+            "input": {
+              "name": "Voice Input Model",
+              "type": "string",
+              "description": "A direct link to a GGUF file for the model, if you need multiple seperate them with commas",
+              "default": ""
+            }
+        },
+        {
+            "key": "KCPP_TTSMODEL",
+            "input": {
+              "name": "Text to Speech Model",
+              "type": "string",
+              "description": "A direct link to a GGUF file for the model, if you need multiple seperate them with commas",
+              "default": ""
+            }
+        },
+        {
+            "key": "KCPP_DONT_REMOVE_MODELS",
+            "input": {
+              "name": "Dont remove models",
+              "type": "string",
+              "description": "We do not attempt to redownload models if your instance crashes",
+              "default": "true"
+            }
+        }
+      ]
+    }
+  }
+  
