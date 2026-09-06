@@ -8906,6 +8906,10 @@ def show_gui():
         searchedmodels = []
         searchedsizes = []
 
+        def hfsearch_get_help():
+            popup.destroy()
+            display_help()
+
         def confirm_search_model_choice():
             nonlocal modelsearch1_var, modelsearch2_var, model_var, fileinfotxt_var
             if modelsearch1_var.get()!="" and modelsearch2_var.get()!="":
@@ -9009,6 +9013,7 @@ def show_gui():
         modelsearch2_var.trace_add("write", update_search_quant_file_size)
         ctk.CTkLabel(popup, text="", textvariable=fileinfotxt_var, text_color="#ffff00").pack(pady=(10, 0))
         ctk.CTkButton(popup, text="Confirm Selection", command=confirm_search_model_choice).pack(pady=5)
+        ctk.CTkButton(popup, text="Get Help", fg_color="#992222", hover_color="#bb3333", command=hfsearch_get_help).pack(pady=5)
 
         popup.transient(root)
 
