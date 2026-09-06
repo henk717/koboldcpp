@@ -3403,6 +3403,24 @@ ModelLoadResult gpttype_load_model(const load_model_inputs inputs, FileFormat in
             }
             printf("Overriding %d MoE layers to CPU...\n",inputs.moecpu);
         }
+        if(ggml_backend_dev_count()>1 && inputs.ffncpu>0)
+        {
+            std::string toadd = "";
+            for (int i = 0; i < inputs.ffncpu; ++i) {
+                std::string tmp = string_format("blk\\.%d\\.ffn_(up|down|gate)\\.=CPU", i);
+                if(i>0)
+                {
+                    tmp = "," + tmp;
+                }
+                toadd += tmp;
+            }
+            if (tensoroverrides == "") {
+                tensoroverrides = toadd;
+            } else {
+                tensoroverrides += "," + toadd;
+            }
+            printf("Overriding %d dense FFN layers to CPU...\n",inputs.ffncpu);
+        }
         if(tensoroverrides!="" && ggml_backend_dev_count()>1)
         {
             printf("Handling Override Tensors for backends: ");

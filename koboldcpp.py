@@ -334,6 +334,7 @@ class load_model_inputs(ctypes.Structure):
                 ("overridenativecontext", ctypes.c_int),
                 ("moe_experts", ctypes.c_int),
                 ("moecpu", ctypes.c_int),
+                ("ffncpu", ctypes.c_int),
                 ("no_bos_token", ctypes.c_bool),
                 ("load_guidance", ctypes.c_bool),
                 ("override_kv", ctypes.c_char_p * overridekv_max),
@@ -2158,6 +2159,7 @@ def load_model(model_filename):
             inputs.override_kv[n] = okv[n].encode("UTF-8")
     inputs.override_tensors = args.overridetensors.encode("UTF-8") if args.overridetensors else "".encode("UTF-8")
     inputs.moecpu = (200 if args.moecpu > 200 else args.moecpu)
+    inputs.ffncpu = (200 if args.ffncpu > 200 else args.ffncpu)
     inputs.check_slowness = (not args.highpriority and os.name == 'nt' and 'Intel' in platform.processor())
     inputs.jinja_template = preloaded_custom_jinja.encode("UTF-8")
     inputs.highpriority = args.highpriority
@@ -8662,6 +8664,7 @@ def show_gui():
     think_effort_var = ctk.StringVar(value="default")
     moeexperts_var = ctk.StringVar(value=str(-1))
     moecpu_var = ctk.StringVar(value=str(0))
+    ffncpu_var = ctk.StringVar(value=str(0))
     defaultgenamt_var = ctk.StringVar(value=str(default_genlen))
     genlimit_var = ctk.StringVar(value=str(0))
     nobostoken_var = ctk.IntVar(value=0)
@@ -9268,15 +9271,19 @@ def show_gui():
             autofit_padding_label.grid(row=6, column=0, padx=8, pady=1, stick="nw")
             autofit_padding_entry.grid(row=6, column=0, padx=160, pady=1, stick="nw")
             moecpu_box.grid_remove()
+            ffncpu_box.grid_remove()
             tenos_box.grid_remove()
             moecpu_box_lbl.grid_remove()
+            ffncpu_box_lbl.grid_remove()
             tenos_box_lbl.grid_remove()
         else:
             autofit_padding_label.grid_remove()
             autofit_padding_entry.grid_remove()
             moecpu_box.grid()
+            ffncpu_box.grid()
             tenos_box.grid()
             moecpu_box_lbl.grid()
+            ffncpu_box_lbl.grid()
             tenos_box_lbl.grid()
 
         changed_gpulayers_estimate()
@@ -9503,7 +9510,8 @@ def show_gui():
     jinja_kwargs_var.trace_add("write", updatejinjathinktoggle)
     gen_defaults_var.trace_add("write", updategendefaults)
     makelabelentry(context_tab, "MoE Experts:", moeexperts_var, row=55, padx=(86), singleline=True, tooltip="Override number of MoE experts.")
-    moecpu_box,moecpu_box_lbl = makelabelentry(context_tab, "MoE CPU Layers:", moecpu_var, row=55, padx=(334), singleline=True, tooltip="Force Mixture of Experts (MoE) weights of the first N layers to the CPU.\nSetting it higher than GPU layers has no effect.", labelpadx=(230))
+    moecpu_box,moecpu_box_lbl = makelabelentry(context_tab, "MoE CPU Layers:", moecpu_var, row=55, padx=(254), singleline=True, tooltip="Force Mixture of Experts (MoE) weights of the first N layers to the CPU.\nSetting it higher than GPU layers has no effect.", labelpadx=(150))
+    ffncpu_box,ffncpu_box_lbl = makelabelentry(context_tab, "FFN CPU Layers:", ffncpu_var, row=55, padx=(414), singleline=True, tooltip="Force dense FFN weights of the first N layers to the CPU.\nSetting it higher than GPU layers has no effect.", labelpadx=(314))
     makelabelentry(context_tab, "Override KV:", override_kv_var, row=57, padx=(86), singleline=True, width=130, tooltip="Override metadata value by key. Separate multiple values with commas. Format is name=type:value. Types: int, float, bool, str")
     tenos_box,tenos_box_lbl = makelabelentry(context_tab, "Override Tensors:", override_tensors_var, row=57, padx=(334), singleline=True, width=130, tooltip="Override selected backend for specific tensors matching tensor_name_regex_pattern=buffer_type, same as in llama.cpp.", labelpadx=(230))
 
@@ -9955,6 +9963,7 @@ def show_gui():
             args.overridenativecontext = 0
         args.moeexperts = int(moeexperts_var.get()) if moeexperts_var.get()!="" else -1
         args.moecpu = int(moecpu_var.get()) if moecpu_var.get()!="" else 0
+        args.ffncpu = int(ffncpu_var.get()) if ffncpu_var.get()!="" else 0
         args.defaultgenamt = int(defaultgenamt_var.get()) if defaultgenamt_var.get()!="" else default_genlen
         args.genlimit = int(genlimit_var.get()) if genlimit_var.get()!="" else 0
         args.nobostoken = (nobostoken_var.get()==1)
@@ -10234,6 +10243,8 @@ def show_gui():
             moeexperts_var.set(mydict["moeexperts"])
         if "moecpu" in mydict and mydict["moecpu"]:
             moecpu_var.set(mydict["moecpu"])
+        if "ffncpu" in mydict and mydict["ffncpu"]:
+            ffncpu_var.set(mydict["ffncpu"])
         if "defaultgenamt" in mydict and mydict["defaultgenamt"]:
             defaultgenamt_var.set(mydict["defaultgenamt"])
         if "genlimit" in mydict and mydict["genlimit"]:
@@ -12169,9 +12180,10 @@ def kcpp_main_process(launch_args, g_memory=None, gui_launcher=False):
             if MaxMemory[0] == 0: #try to get gpu vram for cuda if not picked yet
                 fetch_gpu_properties(True,True)
             if args.autofit:
-                print("Forced autofit is selected, moecpu and overridetensors will be set automatically.")
+                print("Forced autofit is selected; moecpu, ffncpu and overridetensors will be ignored.")
                 args.overridetensors = ""
                 args.moecpu = 0
+                args.ffncpu = 0
             if args.gpulayers==-1 and args.model_param and os.path.exists(args.model_param):
                 if (not args.usecpu) and ((args.usecuda is not None) or (args.usevulkan is not None) or sys.platform=="darwin"):
                     if MaxMemory[0] > 0:
@@ -12183,7 +12195,7 @@ def kcpp_main_process(launch_args, g_memory=None, gui_launcher=False):
                         print("Unable to detect VRAM, but autofit may still be used if applicable.")
                         args.gpulayers = 0
                     # also enable autofit also if permissible
-                    if not args.autofit and not args.tensor_split and not args.overridetensors and not args.moecpu:
+                    if not args.autofit and not args.tensor_split and not args.overridetensors and not args.moecpu and not args.ffncpu:
                         args.autofit = True
                         args.autofitpadding = default_autofit_padding
                         print("GPU layers is default: Will enable AutoFit for increased estimation accuracy.")
@@ -12888,6 +12900,7 @@ if __name__ == '__main__':
     advparser.add_argument("--mmproj", metavar=('[filename]'), help="Select a multimodal projector file for vision models.", default="")
     advparser.add_argument("--mmprojcpu","--no-mmproj-offload", help="Force CLIP for Vision mmproj always on CPU.", action='store_true')
     advparser.add_argument("--moecpu","--n-cpu-moe", "-ncmoe", metavar=('[layers affected]'), help="Keep the Mixture of Experts (MoE) weights of the first N layers in the CPU. If no value is provided, applies to all layers.", nargs='?', const=999, type=int, default=0)
+    advparser.add_argument("--ffncpu","--n-cpu-ffn", "-ncffn", metavar=('[layers affected]'), help="Keep the dense FFN weights of the first N layers in the CPU. If no value is provided, applies to all layers.", nargs='?', const=999, type=int, default=0)
     advparser.add_argument("--moeexperts", metavar=('[num of experts]'), help="How many experts to use for MoE models (default=follow gguf)", type=int, default=-1)
     advparser.add_argument("--multiuser", help="Set maximum number of queued incoming requests allowed.", metavar=('limit'), type=int, nargs='?', const=multiuser_concurrent_limit, default=multiuser_concurrent_limit)
     advparser.add_argument("--multiplayer", help="Hosts a shared multiplayer session that others can join.", action='store_true')
