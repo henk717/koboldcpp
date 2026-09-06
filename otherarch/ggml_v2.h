@@ -212,7 +212,9 @@
 extern "C" {
 #endif
 
-#ifdef __ARM_NEON
+#if defined(__ARM_NEON) && defined(__CUDACC__)
+    typedef half ggml_v2_fp16_t;
+#elif defined(__ARM_NEON) && !defined(_MSC_VER)
     // we use the built-in 16-bit float type
     typedef __fp16 ggml_v2_fp16_t;
 #else
@@ -1073,7 +1075,7 @@ extern "C" {
     //
 
     GGML_V2_API size_t ggml_v2_quantize_q4_0(const float * src, void * dst, int n, int k, int64_t * hist);
-    GGML_V2_API size_t ggml_v2_quantize_q4_1(const float * src, void * dst, int n, int k, int64_t * hist);    
+    GGML_V2_API size_t ggml_v2_quantize_q4_1(const float * src, void * dst, int n, int k, int64_t * hist);
     GGML_V2_API size_t ggml_v2_quantize_q5_0(const float * src, void * dst, int n, int k, int64_t * hist);
     GGML_V2_API size_t ggml_v2_quantize_q5_1(const float * src, void * dst, int n, int k, int64_t * hist);
     GGML_V2_API size_t ggml_v2_quantize_q8_0(const float * src, void * dst, int n, int k, int64_t * hist);
