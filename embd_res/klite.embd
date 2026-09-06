@@ -12,7 +12,7 @@ Current version indicated by LITEVER below.
 -->
 <head>
 	<script id="init-config">
-	const LITEVER = 344;
+	const LITEVER = 345;
 	const urlParams = new URLSearchParams(window.location.search);
 	var localflag = urlParams.get('local'); //this will be replaced automatically in embedded kcpp
 	const STORAGE_PREFIX = (localflag?"e_":"")+"kaihordewebui_";
@@ -4235,6 +4235,7 @@ Current version indicated by LITEVER below.
 	var default_alltalk_base = "http://localhost:7851";
 	var default_comfy_base = "http://localhost:8188";
 
+	//if tts is force disabled, its set to -1
 	const WEBBROWSER_TTS_ID = 1;
 	const KCPP_TTS_ID = 2;
 	const XTTS_ID = 3;
@@ -4465,7 +4466,7 @@ Current version indicated by LITEVER below.
 		inject_randomness_seed: 999,
 		request_logprobs: false,
 		persist_session: true,
-		tts_mode: 0, //0 is disabled
+		tts_mode: 0, //0 is off (automatic), -1 is force disable
 		xtts_voice: "female_calm",
 		kcpp_tts_voice: "kobo",
 		oai_tts_model: "tts-1",
@@ -4479,7 +4480,7 @@ Current version indicated by LITEVER below.
 		tts_stream: false,
 		voice_end_delay: 300,
 		voice_suppress_nonspeech: false,
-		voice_typing_mode: 0,  //0=off, 1=on, 2=ptt, 3=ttt
+		voice_typing_mode: 0,  //0=off, 1=on, 2=ptt, 3=ttt, -1=forcedisable
 		voice_langcode: "auto",
 		tts_speed: 1.0,
 		image_styles: "",
@@ -15231,6 +15232,38 @@ Current version indicated by LITEVER below.
 										console.log("Failed to get local image models: " + error);
 									});
 
+									//check if whisper speech-to-text is enabled, set to PTT if available
+									if(is_using_kcpp_with_whisper())
+									{
+										if(localsettings.voice_typing_mode==0)
+										{
+											localsettings.voice_typing_mode = 2; //set to PTT mode
+										}
+									}
+									else
+									{
+										if(localsettings.voice_typing_mode==2) //don't auto disable the other STT modes for now
+										{
+											localsettings.voice_typing_mode = 0;
+										}
+									}
+
+									//check if kcpp TTS is available, enable it if permitted
+									if(is_using_kcpp_with_tts())
+									{
+										if(localsettings.tts_mode==0)
+										{
+											localsettings.tts_mode = KCPP_TTS_ID;
+										}
+									}
+									else
+									{
+										if(localsettings.tts_mode==KCPP_TTS_ID)
+										{
+											localsettings.tts_mode = 0;
+										}
+									}
+
 									//prompt to request password for kcpp
 									if(localflag && has_password && !localmodekey)
 									{
@@ -17610,7 +17643,7 @@ Current version indicated by LITEVER below.
 			document.getElementById("btn_inner_genimg_custom").classList.remove("bg_gray");
 		}
 
-		if(localsettings.tts_mode==0)
+		if(localsettings.tts_mode<=0)
 		{
 			document.getElementById("btn_inner_genspeech_custom").classList.add("bg_gray");
 		} else {
@@ -17638,11 +17671,13 @@ Current version indicated by LITEVER below.
 		if(is_using_kcpp_with_lcppui())
 		{
 			document.getElementById("btn_open_lcppui").classList.remove("hidden");
+			document.getElementById("btn_open_lcppui2").classList.remove("hidden");
 			document.getElementById("links_to_other_uis").classList.remove("hidden");
 		}
 		else
 		{
 			document.getElementById("btn_open_lcppui").classList.add("hidden");
+			document.getElementById("btn_open_lcppui2").classList.add("hidden");
 			document.getElementById("links_to_other_uis").classList.add("hidden");
 		}
 	}
@@ -20014,7 +20049,7 @@ Current version indicated by LITEVER below.
 	function manual_tts()
 	{
 		let ssval = localsettings.tts_mode;
-		if (ssval == 0) {
+		if (ssval <= 0) {
 			if (is_using_kcpp_with_tts()) {
 				msgboxYesNo("Error: No TTS Generator was selected!\nPlease select a Text-To-Speech option in Media Settings first.\n\nKoboldCpp with TTS support was detected!\nEnable KoboldCpp TTS?", "No TTS Generator",()=>{
 					localsettings.tts_mode = KCPP_TTS_ID;
@@ -20071,7 +20106,7 @@ Current version indicated by LITEVER below.
 
 		const selectedTTS = document.getElementById("ttsselect").value;
 
-		if (selectedTTS == 0) {
+		if (selectedTTS <= 0) {
 			document.getElementById("narratedialogdiv").classList.add("hidden");
 			document.getElementById("narratetargetsdiv").classList.add("hidden");
 		} else {
@@ -20691,6 +20726,7 @@ Current version indicated by LITEVER below.
 
 	var ptt_start_timestamp = performance.now();
 	var recent_voice_duration = 0;
+	var voice_init_attempts = 0;
 	function ptt_start()
 	{
 		if(localsettings.voice_typing_mode==3 && voice_is_speaking)
@@ -20705,7 +20741,7 @@ Current version indicated by LITEVER below.
 			++voice_speaking_counter;
 			if(ready_to_record())
 			{
-				if (voicerecorder.state === "inactive") {
+				if (voicerecorder && voicerecorder.state === "inactive") {
 					if (voiceprerecorder.state !== "inactive") {
 						voiceprerecorder.stop();
 					}
@@ -20714,11 +20750,26 @@ Current version indicated by LITEVER below.
 				voice_is_recording = true;
 				update_submit_button(false);
 				ptt_start_timestamp = performance.now();
+				voice_init_attempts = 0;
 			}
 			else if(!isVoiceInputConfigured)
 			{
 				//trigger popup for audio permissions
 				init_voice_typing();
+				++voice_init_attempts;
+
+				if(voice_init_attempts>2)
+				{
+					//no permissions, fall back to submit, fall back to click behavior
+					if(is_corpo_ui() || is_aesthetic_ui())
+					{
+						chat_submit_generation();
+					}
+					else
+					{
+						prepare_submit_generation();
+					}
+				}
 			}
 		}
 	}
@@ -20767,7 +20818,7 @@ Current version indicated by LITEVER below.
 	}
 	function submit_generation_button(aesthetic_ui)
 	{
-		if(localsettings.voice_typing_mode==0 || !is_using_kcpp_with_whisper()) //normal submit when voice off, or when whisper is unavailable (e.g. stale saved setting) so the button still works
+		if(localsettings.voice_typing_mode<=0 || !is_using_kcpp_with_whisper()) //normal submit when voice off, or when whisper is unavailable (e.g. stale saved setting) so the button still works
 		{
 			if(aesthetic_ui)
 			{
@@ -24786,6 +24837,7 @@ Current version indicated by LITEVER below.
 	}
 
 	var isVoiceInputConfigured = false;
+	var isVoiceInputInitializing = false;
 	function init_voice_typing()
 	{
 		if(navigator.mediaDevices==null)
@@ -24794,10 +24846,10 @@ Current version indicated by LITEVER below.
 			localsettings.voice_typing_mode = document.getElementById("voice_typing_mode").checked = 0;
 			return;
 		}
-		if (isVoiceInputConfigured) {
+		if (isVoiceInputConfigured || isVoiceInputInitializing) {
 			return;
 		}
-		isVoiceInputConfigured = true;
+		isVoiceInputInitializing = true;
 
 		//under BSD-3-Clause license
 		//original source https://github.com/kdavis-mozilla/vad.js Copyright (c) 2015, Kelly Daviss
@@ -24847,6 +24899,9 @@ Current version indicated by LITEVER below.
 		navigator.mediaDevices.getUserMedia({
 			audio: true
 		}).then(function (stream) {
+			isVoiceInputConfigured = true;
+			isVoiceInputInitializing = false;
+			voice_init_attempts = 0;
 			voiceprerecorder = new MediaRecorder(stream);
 			voiceprerecorder.addEventListener('dataavailable', (ev)=>{
 				preaudiobuffers.push(ev.data);
@@ -24888,6 +24943,11 @@ Current version indicated by LITEVER below.
 			};
 			// Create VAD
 			let myvad = new VAD(options);
+			update_submit_button(false);
+		}).catch(function (error) {
+			//voice init failed
+			isVoiceInputConfigured = false;
+			isVoiceInputInitializing = false;
 		});
 	}
 	function dispatch_transcribe_audio(dataurl)
@@ -30795,6 +30855,7 @@ Current version indicated by LITEVER below.
 				<div style="margin-top: 10px;">
 					<p class="color_lightgray" id="welcomeuidesc"></p>
 					<p>Alternatively, you can <a href="#" class="color_blueurl" onclick="close_welcome_panel(false);load_file_button()">Load A Savefile</a> or <a href="#" class="color_blueurl" onclick="close_welcome_panel(false);display_scenarios()">Quick Start Scenario</a></p>
+					<p class="hidden" id="btn_open_lcppui2">Or, <a href="#" class="color_blueurl" onclick="go_to_lcppui()">Launch llama.cpp UI</a></p>
 				</div>
 			</div>
 			<div class="popupfooter">
@@ -32172,12 +32233,13 @@ Current version indicated by LITEVER below.
 							<div class="justifyleft">Text to speech <span class="helpicon">?<span class="helptext">Enable Text-To-Speech to have your story or chat automatically read to you. You can also generate audio clips with this enabled in the Add File menu.</span></span></div>
 							<div class="push-right">
 							<select title="Text To Speech" class="form-control" id="ttsselect" onchange="toggle_tts_mode()">
-								<option value="0">Disabled</option>
+								<option value="0">Off</option>
 								<option value="1">Browser Inbuilt TTS</option>
 								<option value="2">KoboldCpp TTS API</option>
 								<option value="3">XTTS API Server</option>
 								<option value="4">AllTalk API Server</option>
 								<option value="5">OpenAI-Compat. API Server</option>
+								<option value="-1">Force Disable</option>
 							</select>
 							</div>
 							<button id="manual_tts" type="button" class="bg_green btn btn-primary" style="margin-left: 2px;" onclick="test_tts()">Test</button>
@@ -32318,6 +32380,7 @@ Current version indicated by LITEVER below.
 								<option value="1">Detect Voice</option>
 								<option value="2">Push-To-Talk</option>
 								<option value="3">Toggle-To-Talk</option>
+								<option value="-1">Force Disable</option>
 							</select>
 							</div>
 						</div>
