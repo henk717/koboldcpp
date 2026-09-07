@@ -70,7 +70,7 @@ fi
 
 if [ -n "$KCPP_PORTABLE" ]; then
 	LLAMA_PORTABLE_FLAG="LLAMA_PORTABLE=1"
-	PORTABLE_SO="$PORTABLE_SO"
+	PORTABLE_SO="--add-data './koboldcpp_failsafe.so:.'"
 fi
 
 if [ "$KCPP_CUDA" = "rocm" ]; then
