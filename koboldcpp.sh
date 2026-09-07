@@ -30,6 +30,8 @@ if [[ ! -f "conda/envs/linux/bin/python" && $KCPP_CUDA != "rocm" || $1 == "rebui
 			fi
 		elif command -v rocmsmi &>/dev/null || [ -d /opt/rocm ]; then
 			KCPP_CUDA=rocm
+		else
+			KCPP_CUDA=12.1.0
 		fi
 	fi
 	bin/micromamba create --no-rc --no-shortcuts -r conda -p conda/envs/linux -f environment.tmp.yaml -y
